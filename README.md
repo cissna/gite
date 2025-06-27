@@ -30,6 +30,7 @@ function format_git_commands(unformatted_git_commands_string)
 
 function propose_git_commands_to_user(formatted_git_commands_string)
 
+function handle_conversation_until_no_question(conversation)
 
 system_prompt = """You are an Expert Git assistant helping a beginner use Git. They want to do something with Git which they can describe, but need you to help them translate that into a viable command.
 To be viable, the command must be non-interactive, i.e., executable without ANY alterations—no fill in the blanks or ...s.
@@ -47,33 +48,13 @@ main logic:
         user: user_str
     }
 
-    LLM_output_string = send_to_LLM(conversation).strip()
-    while LLM_output_string ends in a "?":
-        conversation = add {assistant: LLM_output_string} to the end of conversation
-
-        # note that the user_response can actually be
-        # (command execution)-generated, not from real user text.
-        user_response = answer_question(conversation)
-        
-        conversation = add {user: user_response} to the end of conversation
-
-        LLM_output_string = send_to_LLM(conversation).strip()
+    LLM_output_string = handle_conversation_until_no_question(conversation)
 
     # update the conversation inside the function:
     conversation = deal_with_potential_limitations(conversation, LLM_output_string)
     # this is first-order processing only. we assume that after deal_with_potential_limitations, there are no limitations left, so we don't bother to check after this, beyond letting the LLM ask questions.
 
-    LLM_output_string = send_to_LLM(conversation).strip()
-    while LLM_output_string ends in a "?":
-        conversation = add {assistant: LLM_output_string} to the end of conversation
-
-        # note that the user_response can actually be
-        # (command execution)-generated, not from real user text.
-        user_response = answer_question(conversation)
-        
-        conversation = add {user: user_response} to the end of conversation
-
-        LLM_output_string = send_to_LLM(conversation).strip()
+    LLM_output_string = handle_conversation_until_no_question(conversation)
 
     git_commands = format_git_commands(LLM_output_string)
 
@@ -97,6 +78,17 @@ function format_git_commands(unformatted_git_commands_string):
 # recursive function where the base case is that the user says yes/no. recursively calls itself if user says explain->edit, and LLM proposes new git commands
 function propose_git_commands_to_user(formatted_git_commands_string):
     pass
+
+# handle the conversational exchange loop with the LLM, returning when the LLM no longer asks questions
+function handle_conversation_until_no_question(conversation):
+    LLM_output_string = send_to_LLM(conversation, model).strip()
+    while LLM_output_string ends in "?":
+        conversation = add {assistant: LLM_output_string} to the end of conversation
+        # user_response may come from user or automated execution
+        user_response = answer_question(conversation)
+        conversation = add {user: user_response} to the end of conversation
+        LLM_output_string = send_to_LLM(conversation, model=quick).strip()
+    return conversation, LLM_output_string
 ```
 
 # Future considerations
