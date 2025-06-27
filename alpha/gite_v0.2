@@ -1,0 +1,223 @@
+#!/bin/bash
+#
+# gite - An AI-powered Git command-line assistant, now on GPT-4.1 via OpenAI-Compatible API.
+#
+# This script takes a natural language description of a Git task,
+# calls an OpenAI-Compatible endpoint, and allows the user to
+# ask for explanations and edits before executing the command(s).
+
+# --- Configuration ---
+BASE_URL="http://oco40g4o4cssokcogg8sso0w.20.51.211.53.sslip.io/v1"
+API_URL="${BASE_URL}/chat/completions"
+OPENAI_API_KEY="${S_OPENAI_API_KEY:?Environment variable OPENAI_API_KEY must be set}"
+CUSTOM_MODEL_HEADER="gpt41"
+
+# --- Pre-flight Checks ---
+for cmd in curl jq; do
+  if ! command -v "$cmd" &> /dev/null; then
+    echo "Error: '$cmd' is not installed. Please install it."
+    exit 1
+  fi
+done
+
+if [ "$#" -eq 0 ]; then
+  echo "Usage: gite \"your git command in plain english\""
+  exit 1
+fi
+
+# --- Functions ---
+
+# NEW: Function to get a command, handling clarifications.
+# Takes a JSON payload as input, returns the final command and the updated payload.
+generate_command() {
+    local payload="$1"
+    
+    while true; do
+        local response
+        response=$(curl -s -X POST "$API_URL" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -H "model: $CUSTOM_MODEL_HEADER" \
+            -d "$payload")
+
+        if echo "$response" | jq -e '.error' &> /dev/null; then
+            echo "Error: API call failed." >&2
+            echo "$response" >&2
+            exit 1
+        fi
+
+        local ai_response
+        ai_response=$(echo "$response" | jq -r '.choices[0].message.content')
+
+        if [[ "$ai_response" == *'?' ]]; then
+            echo
+            echo -e "\033[1;33mAI needs clarification:\033[0m"
+            echo "$ai_response"
+            read -p "Your answer: " user_answer
+            echo
+            echo "gite: Thinking with your new information..."
+
+            payload=$(echo "$payload" | jq \
+                --arg assistant_question "$ai_response" \
+                --arg user_answer "$user_answer" \
+                '.messages += [{"role": "assistant", "content": $assistant_question}, {"role": "user", "content": $user_answer}]')
+            continue
+        else
+            GIT_COMMAND="$ai_response"
+            PAYLOAD="$payload" # Store final payload
+            break
+        fi
+    done
+}
+
+# NEW: Function to get an explanation for a command.
+get_explanation() {
+    local command_to_explain="$1"
+    local explanation_prompt="You are a Git expert. Explain the following command(s) in a clear, concise way. Focus on what each part does and why it's useful. Do not add any conversational fluff."
+    local user_content="Please explain this command/script:\n\n\`\`\`bash\n$command_to_explain\n\`\`\`"
+
+    local explanation_payload
+    explanation_payload=$(jq -n \
+        --arg model "$CUSTOM_MODEL_HEADER" \
+        --arg system "$explanation_prompt" \
+        --arg user "$user_content" \
+        '{ model: $model, messages: [ {role: "system", content: $system}, {role: "user", content: $user} ], temperature: 0.1, max_tokens: 400 }')
+
+    local response
+    response=$(curl -s -X POST "$API_URL" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $OPENAI_API_KEY" \
+        -H "model: $CUSTOM_MODEL_HEADER" \
+        -d "$explanation_payload")
+    
+    AI_EXPLANATION=$(echo "$response" | jq -r '.choices[0].message.content')
+}
+
+# NEW: Function to execute the final commands.
+execute_commands() {
+    local commands_to_run="$1"
+    echo "Executing…"
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        echo "+ $line"
+        eval "$line"
+        if [ $? -ne 0 ]; then
+            echo -e "\033[0;31mError executing command. Aborting.\033[0m"
+            exit 1
+        fi
+    done <<< "$commands_to_run"
+}
+
+
+# --- Main Logic ---
+
+USER_PROMPT="$*"
+SYSTEM_PROMPT="You are an expert Git assistant. Your goal is to provide the correct git command(s).
+
+1. If the user's request can be fulfilled with a single, non-interactive command, return it inside single backticks. Example: \`git status\`
+2. If the request requires multiple sequential, non-interactive commands, return them in a triple-backticked code block, one command per line. Example:
+\`\`\`
+git add .
+git commit -m \"New feature\"
+\`\`\`
+3. If you are unsure or need more information, ask a single, clear clarifying question. Your response MUST end with a question mark. Example: What is the name of the branch you want to merge?
+
+Return ONLY the command(s) or the question. Do not add any other explanations or conversational text."
+
+PAYLOAD=$(jq -n \
+  --arg model "$CUSTOM_MODEL_HEADER" \
+  --arg system "$SYSTEM_PROMPT" \
+  --arg user "$USER_PROMPT" \
+  '{ model: $model, messages: [ { role: "system", content: $system }, { role: "user",   content: $user } ], temperature: 0, max_tokens: 200 }')
+
+echo "gite: Thinking…"
+
+# NEW: The main interaction loop.
+while true; do
+    generate_command "$PAYLOAD" # This will set global GIT_COMMAND and PAYLOAD
+
+    if [ -z "$GIT_COMMAND" ]; then
+      echo "Error: received an empty or invalid command from the AI."
+      exit 1
+    fi
+
+    # Process single or multi-line command blocks.
+    if [[ "$GIT_COMMAND" == \`\`\`* ]]; then
+      PARSED_COMMAND=$(echo "$GIT_COMMAND" | sed '1d;$d')
+    else
+      PARSED_COMMAND=$(echo "$GIT_COMMAND" | sed 's/^`//;s/`$//')
+    fi
+
+    echo
+    echo -e "\033[1;34mSuggested command(s):\033[0m"
+    if [ "$(echo "$PARSED_COMMAND" | wc -l)" -gt 1 ]; then
+        echo -e "\033[1m"
+        echo "$PARSED_COMMAND" | cat -n
+        echo -e "\033[0m"
+    else
+        echo -e "\033[1m$PARSED_COMMAND\033[0m"
+    fi
+
+    echo -e "\033[0;33mWarning: Always review AI-generated commands before running.\033[0m"
+    read -p "Execute? [y]es / [e]xplain / [n]o: " -r primary_choice
+    
+    case $primary_choice in
+        [Yy]*)
+            execute_commands "$PARSED_COMMAND"
+            break
+            ;;
+
+        [Nn]*)
+            echo "Cancelled."
+            break
+            ;;
+
+        [Ee]*)
+            echo
+            echo "gite: Asking for an explanation..."
+            get_explanation "$PARSED_COMMAND"
+            
+            echo
+            echo -e "\033[1;34mExplanation:\033[0m"
+            echo -e "$AI_EXPLANATION"
+            echo
+
+            read -p "Execute? [y]es / [e]dit / [n]o: " -r secondary_choice
+            case $secondary_choice in
+                [Yy]*)
+                    execute_commands "$PARSED_COMMAND"
+                    break
+                    ;;
+                [Nn]*)
+                    echo "Cancelled."
+                    break
+                    ;;
+                [Ee]*)
+                    echo
+                    read -p "Describe the changes you want to make: " user_edits
+                    # Rebuild payload with full context for the edit request
+                    PAYLOAD=$(echo "$PAYLOAD" | jq \
+                        --arg command "$GIT_COMMAND" \
+                        --arg explanation "$AI_EXPLANATION" \
+                        --arg edits "My previous request resulted in the command(s) above. After seeing the explanation, I would like to make the following changes: $user_edits" \
+                        '.messages += [
+                            {"role": "assistant", "content": $command},
+                            {"role": "assistant", "name": "explanation", "content": $explanation},
+                            {"role": "user", "content": $edits}
+                         ]')
+                    echo
+                    echo "gite: Thinking about your edits..."
+                    continue # Restart the main loop with the updated payload
+                    ;;
+                *)
+                    echo "Invalid option. Cancelling."
+                    break
+                    ;;
+            esac
+            ;;
+        *)
+            echo "Invalid option. Cancelling."
+            break
+            ;;
+    esac
+done
