@@ -15,8 +15,97 @@ so I created this repo and outlines the tool I wanted to make in pseudocode. See
 
 ## Pseudocode
 ```pseudocode
+function declarations:
 
+function send_to_LLM(chat_obj, model)
+# where chat_obj has a system prompt, then messages back and forth between 'user' and 'assistant', ending with a message from the user. I'll later call it `conversation` instead of `chat_obj`
+# assume that some sort of config defines quick, quicker, quickest models, so model can just be quick, quicker, or quickest and that can be decided by the user
+# for now, i am using GPT-4.1, mini, and nano for these 3
+
+function deal_with_potential_limitations(conversation, LLM_response_proposing_commands)
+
+function identify_potential_limitations_with_proposed_commands(conversation, LLM_response_proposing_commands)
+
+function format_git_commands(unformatted_git_commands_string)
+
+function propose_git_commands_to_user(formatted_git_commands_string)
+
+
+system_prompt = """You are an Expert Git assistant helping a beginner use Git. They want to do something with Git which they can describe, but need you to help them translate that into a viable command.
+To be viable, the command must be non-interactive, i.e., executable without ANY alterations—no fill in the blanks or ...s.
+They will provide you a description of what they want, and you will return a non-interactive command or a list of non-interactive commands that accomplishes their goal.
+They might not have provide all of the necessary information to make the perfect non-interactive command, in which case you MUST follow up with a clarifying question.
+NEVER return with git commands if you are unsure if they will meet the user's needs—accuracy is paramount.
+If you ask a question, ensure your message ends with a `?`
+If you provide git commands, ensure your message does not end in a `?`, which exclusively indicates a question."""
+
+main logic:
+    user_str = user passes in a string describing what they want with a command like `gite "merge dev into this branch"`
+
+    conversation = {
+        system: system_prompt,
+        user: user_str
+    }
+
+    LLM_output_string = send_to_LLM(conversation).strip()
+    while LLM_output_string ends in a "?":
+        conversation = add {assistant: LLM_output_string} to the end of conversation
+
+        # note that the user_response can actually be
+        # (command execution)-generated, not from real user text.
+        user_response = answer_question(conversation)
+        
+        conversation = add {user: user_response} to the end of conversation
+
+        LLM_output_string = send_to_LLM(conversation).strip()
+
+    # update the conversation inside the function:
+    conversation = deal_with_potential_limitations(conversation, LLM_output_string)
+    # this is first-order processing only. we assume that after deal_with_potential_limitations, there are no limitations left, so we don't bother to check after this, beyond letting the LLM ask questions.
+
+    LLM_output_string = send_to_LLM(conversation).strip()
+    while LLM_output_string ends in a "?":
+        conversation = add {assistant: LLM_output_string} to the end of conversation
+
+        # note that the user_response can actually be
+        # (command execution)-generated, not from real user text.
+        user_response = answer_question(conversation)
+        
+        conversation = add {user: user_response} to the end of conversation
+
+        LLM_output_string = send_to_LLM(conversation).strip()
+
+    git_commands = format_git_commands(LLM_output_string)
+
+    # all final processing happens in this function
+    propose_git_commands_to_user(git_commands)
+
+
+
+function definitions:
+send_to_LLM will depend on model, but for now just assume my specific set up
+
+function deal_with_potential_limitations(conversation, LLM_response_proposing_commands):
+    pass
+
+function identify_potential_limitations_with_proposed_commands(conversation, LLM_response_proposing_commands):
+    pass
+
+function format_git_commands(unformatted_git_commands_string):
+    pass
+
+# recursive function where the base case is that the user says yes/no. recursively calls itself if user says explain->edit, and LLM proposes new git commands
+function propose_git_commands_to_user(formatted_git_commands_string):
+    pass
 ```
 
 # Future considerations
+## Short-term future considerations
+- Config stuff:
+    - --verbose: prints all API calls
+    - --quiet: print bare minimum
+    - --auto-accept: self-explanatory, maybe allow for different levels so user input can/cannot be an option at times.
+
+- should edit include necesarily previous explanation of the commands? probably...
+## Long-term future considerations
 Right now, the tool only works with my specific Azure GPT-4.1 API key, which is less than ideal. I'll make setup more user friendly once I'm happy with the project.
