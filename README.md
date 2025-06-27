@@ -82,6 +82,8 @@ main logic:
 function definitions:
 send_to_LLM will depend on model, but for now just assume my specific set up
 
+# this is the one that, if there are limitations found, we forge an LLM message in the conversation
+# where it says something like "I was considering using these commands [git_commands]\nBut I am worried about a potential limitation: [limitation output of identify_potential_limitations_with_proposed_commands]. [question associated with limitation]?"
 function deal_with_potential_limitations(conversation, LLM_response_proposing_commands):
     pass
 
