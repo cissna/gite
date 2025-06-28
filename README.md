@@ -73,11 +73,14 @@ main logic:
 
         logs = run_commands_in_users_terminal_and_collect_logs(git_commands_to_run)
 
-        failed = are_logs_bad(logs)
+        failed = are_logs_bad(logs, git_commands_to_run)
         if failed:
             conversation = add {
                 user: "I tried running these commands but I got this response:\n\n[logs]\n\nIf the solution to this is obvious, propose new git commands. If it is not, ask me questions that will help you better understand the problem."
             } to conversation
+        else:
+            # if logs are not bad, we assume success and exit the loop
+            print "Commands executed successfully."
 
 
 
@@ -171,15 +174,29 @@ function handle_conversation_until_no_question(conversation):
 
 function run_commands_in_users_terminal_and_collect_logs(list_of_commands):
     pass  # I don't know how to implement this, should return string of logs
+function are_logs_bad(logs, commands):
+    if logs are empty: return False
 
-function are_logs_bad(logs):
-    if logs are empty return False
+    # ask the quickest model to analyze the logs and commands
+    # the model should be instructed to respond with one of three things:
+    # 1. 'no' if the commands succeeded
+    # 2. 'yes' if the commands failed for a generic reason
+    # 3. 'conflict: [explanation]' if the commands resulted in a merge conflict. The explanation should be a short, user-friendly guide on how to resolve it.
+    model_response = send_to_LLM_with_special_instructions(...)
 
-    ask quickest model if the logs (along with the attempted commands, but no other context) indicate something failed—strictly only respond 'yes' or 'no'
-    # probably make explicit exception for merge conflicts,
-    # i don't think they are resolvable in command line
-    if model's response is yes return True
-    else return False
+    if model_response is 'no':
+        return False # logs are not bad
+    if model_response is 'yes':
+        return True # logs are bad
+    if model_response starts with 'conflict:':
+        # print the explanation and treat as "not bad" to exit the main loop
+        conflict_explanation = the rest of the model_response string
+        print (in red, bold text) "Merge conflict detected."
+        print (in normal text) conflict_explanation
+        return False # logs are not "bad" in a way that requires a retry
+
+    # if the model returns something unexpected, assume it's a failure
+    return True
 
 ```
 
