@@ -182,11 +182,20 @@ function are_logs_bad(logs, commands):
     # 1. 'no' if the commands succeeded
     # 2. 'yes' if the commands failed for a generic reason
     # 3. 'conflict: [explanation]' if the commands resulted in a merge conflict. The explanation should be a short, user-friendly guide on how to resolve it.
-    model_response = send_to_LLM_with_special_instructions(...)
 
-    if model_response is 'no':
+    model_response = send_to_LLM_with_special_instructions({
+        system: "You are a failure detector, designed to determine whether terminal commands resulted in failure or not based on their logs. You also have a carve-out for git commands that result in merge conflicts.
+        You will STRICTLY output 'failure', 'success' or 'conflict: .+'.
+        Unless there is a merge conflict, you will only output the SINGLE WORD that describes the situation.
+        DO NOT provide any additional explanation text, markdown formatting or anything else.
+        If there is a conflict, you should output 'conflict: [explanation of how to resolve the conflict]'
+        so you can assist the user in manually solving the conflict.",
+        user: "I ran these commands:\n```\n{commands, line by line}\n```\nAnd this was the output:\n```\n{logs}\n```\nDid it fail, succeed, or was there a merge conflict (and if so, how do I fix the conflict)?"
+    }, model=quickest)
+
+    if model_response is 'success':
         return False # logs are not bad
-    if model_response is 'yes':
+    if model_response is 'failure':
         return True # logs are bad
     if model_response starts with 'conflict:':
         # print the explanation and treat as "not bad" to exit the main loop
