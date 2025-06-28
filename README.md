@@ -28,7 +28,7 @@ function identify_potential_limitations_with_proposed_commands(conversation, LLM
 
 function format_git_commands(unformatted_git_commands_string)
 
-function get_valid_user_choice(valid_choices, prompt_text)
+function get_valid_user_choice(nonexit_choices, prompt_text)
 
 function propose_git_commands_to_user(conversation, formatted_git_commands_string)
 
@@ -36,7 +36,7 @@ function handle_conversation_until_no_question(conversation)
 
 function run_commands_in_users_terminal_and_collect_logs(list_of_commands)
 
-function are_logs_bad(logs)
+function are_logs_bad(logs, commands)
 
 system_prompt = """You are an Expert Git assistant helping a beginner use Git. They want to do something with Git which they can describe, but need you to help them translate that into a viable command.
 To be viable, the command must be non-interactive, i.e., executable without ANY alterations—no fill in the blanks or ...s.
@@ -96,9 +96,11 @@ function identify_potential_limitations_with_proposed_commands(conversation, LLM
     pass
 
 function format_git_commands(unformatted_git_commands_string):
-    # The LLM's response might include explanatory text, markdown code blocks, etc.
-    # This function's job is to isolate only the commands themselves.
-    # It sends the raw LLM output to the quickest model with a simple instruction.
+    # The LLM output may include extra explanation, markdown formatting, or other noise.
+    # This function sends that output to the quickest model, instructing:
+    #   - Only extract actual git commands.
+    #   - Return only the commands, each on its own line.
+    #   - Do not output any explanations, markdown, or formatting.
 
     formatted_string = send_to_LLM({
         system: "You are a parser. The user will provide text that contains one or more terminal commands, possibly surrounded by explanatory text or markdown formatting.
@@ -108,23 +110,22 @@ function format_git_commands(unformatted_git_commands_string):
         user: unformatted_git_commands_string
     }, model=quickest)
 
-    # The result should be a clean string with each command on a new line.
-    # Split this string into a list of commands to be executed.
-    return formatted_string.split('\n')  # this line is python not pseudocode
+    # Split into lines, removing blank lines and stripping any whitespace.
+    return [line.strip() for line in formatted_string.split('\n') if line.strip()]  # this line is python not pseudocode
 
 # Helper to validate user input and handle cancellation/reprompt
-function get_valid_user_choice(valid_choices, prompt_text):
+function get_valid_user_choice(nonexit_choices, prompt_text):
     while True:
         print (in normal text) prompt_text
         char = read 1 character (don't wait for enter)
-        if char in valid_choices:
+        if char in nonexit_choices:
             return char
         if char == 'n':
             exit program and print "Cancelled."
         # one more try then cancel
         print (in normal text) prompt_text
         char = read 1 character (don't wait for enter)
-        if char in valid_choices:
+        if char in nonexit_choices:
             return char
         exit program and print "Cancelled."
 
@@ -132,7 +133,7 @@ function get_valid_user_choice(valid_choices, prompt_text):
 # proposes git commands to user, supports explain/edit/execute without code duplication
 function propose_git_commands_to_user(conversation, formatted_git_commands_string):
     while True:
-        print (in blue, bold text) f"Suggested command{'s' if multiple commands else ''}:\n"
+        print (in blue, bold text) "Suggested command{'s' if multiple commands else ''}:\n"
         print each command in bold, default-color text line by line
         print (in yellow, not bold text) "Warning: Always review AI-generated commands."
         choice = get_valid_user_choice(['y', 'e'], "Execute? [y]es / [e]xplain / [n]o:")
@@ -142,7 +143,7 @@ function propose_git_commands_to_user(conversation, formatted_git_commands_strin
             # Explain path
             LLM_response = send_to_LLM(conversation={
                 system: "You are a terminal-embedded LLM assisting a beginner terminal-user. They will provide some commands they are confused about, and you will explain granularly but concisely what the command does. Don't repeat yourself or add any fluff, and don't put any markdown formatting as it will not render.",
-                user: ("Please explain what this does before I execute it" if (only one command) else "Please explain what these do before I execute them") + f"```\n{commands, line by line}\n```"
+                user: ("Please explain what this does before I execute it" if (only one command) else "Please explain what these do before I execute them") + "```\n{commands, line by line}\n```"
             }, model=quicker)
             print LLM_response
             # Now prompt for execute/edit/no
@@ -155,7 +156,7 @@ function propose_git_commands_to_user(conversation, formatted_git_commands_strin
                 # Update conversation with clarification and previous explanation
                 add to end of conversation {
                     assistant: formatted_git_commands_string,
-                    user: f"can you explain {"that command" if only one command else  "those commands"}?",
+                    user: ("can you explain that command?" if only one command else "can you explain those commands?"),
 
                     # the '?' is because without it, it could influence LLM to send
                     # non-git-command messages that don't end in a '?', which should never happen.
