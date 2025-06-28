@@ -96,10 +96,21 @@ function identify_potential_limitations_with_proposed_commands(conversation, LLM
     pass
 
 function format_git_commands(unformatted_git_commands_string):
-    pass the unformatted_git_commands_string to the quickest model and ask it to parse
-    out only the actual git commands from the text. Make sure they are returned with no additional text, no formatting, and with each command (if multiple) on separate lines.
-    
-    Then do the equivalent of python's output.split('\n') to make it a list, and return that list
+    # The LLM's response might include explanatory text, markdown code blocks, etc.
+    # This function's job is to isolate only the commands themselves.
+    # It sends the raw LLM output to the quickest model with a simple instruction.
+
+    formatted_string = send_to_LLM({
+        system: "You are a parser. The user will provide text that contains one or more terminal commands, possibly surrounded by explanatory text or markdown formatting.
+        Extract only the git commands.
+        Return ONLY the commands, each on a new line.
+        Do not include any other text, explanation, or markdown formatting like ```.",
+        user: unformatted_git_commands_string
+    }, model=quickest)
+
+    # The result should be a clean string with each command on a new line.
+    # Split this string into a list of commands to be executed.
+    return formatted_string.split('\n')  # this line is python not pseudocode
 
 # Helper to validate user input and handle cancellation/reprompt
 function get_valid_user_choice(valid_choices, prompt_text):
@@ -174,6 +185,7 @@ function handle_conversation_until_no_question(conversation):
 
 function run_commands_in_users_terminal_and_collect_logs(list_of_commands):
     pass  # I don't know how to implement this, should return string of logs
+
 function are_logs_bad(logs, commands):
     if logs are empty: return False
 
@@ -216,6 +228,5 @@ function are_logs_bad(logs, commands):
     - --quiet: print bare minimum
     - --auto-accept: self-explanatory, maybe allow for different levels so user input can/cannot be an option at times.
 
-- should edit include necesarily previous explanation of the commands? probably...
 ## Long-term future considerations
 Right now, the tool only works with my specific Azure GPT-4.1 API key, which is less than ideal. I'll make setup more user friendly once I'm happy with the project.
