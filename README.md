@@ -11,7 +11,7 @@ The solution, of course, was to embed English in the command line.
 I made some alpha versions with Gemini (see `alpha/`)
 and it worked really well.
 But then I realized I wanted it to be more robust of a tool than vague prompting would make,
-so I created this repo and outlines the tool I wanted to make in pseudocode. See below:
+so I created this repo and outlined the tool I wanted to make in pseudocode. See below:
 
 ## Pseudocode
 ```pseudocode
