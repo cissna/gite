@@ -28,6 +28,8 @@ function identify_potential_limitations_with_proposed_commands(conversation, LLM
 
 function format_git_commands(unformatted_git_commands_string)
 
+function get_valid_user_choice(valid_choices, prompt_text)
+
 function propose_git_commands_to_user(conversation, formatted_git_commands_string)
 
 function handle_conversation_until_no_question(conversation)
@@ -96,66 +98,63 @@ function format_git_commands(unformatted_git_commands_string):
     
     Then do the equivalent of python's output.split('\n') to make it a list, and return that list
 
-# recursive function where the base case is that the user says yes/no. recursively calls itself if user says explain->edit, and LLM proposes new git commands
+# Helper to validate user input and handle cancellation/reprompt
+function get_valid_user_choice(valid_choices, prompt_text):
+    while True:
+        print (in normal text) prompt_text
+        char = read 1 character (don't wait for enter)
+        if char in valid_choices:
+            return char
+        if char == 'n':
+            exit program and print "Cancelled."
+        # one more try then cancel
+        print (in normal text) prompt_text
+        char = read 1 character (don't wait for enter)
+        if char in valid_choices:
+            return char
+        exit program and print "Cancelled."
+
+
+# proposes git commands to user, supports explain/edit/execute without code duplication
 function propose_git_commands_to_user(conversation, formatted_git_commands_string):
-    print (in blue, bold text) f"Suggested command{"s" if multiple commands else ""}:\n"
-    print each command in bold, default-color text line by line
-    print (in yellow, not bold text) "Warning: Always review AI-generated commands."
-    print (in normal text) "Execute? [y]es / [e]xplain / [n]o:"
+    while True:
+        print (in blue, bold text) f"Suggested command{'s' if multiple commands else ''}:\n"
+        print each command in bold, default-color text line by line
+        print (in yellow, not bold text) "Warning: Always review AI-generated commands."
+        choice = get_valid_user_choice(['y', 'e'], "Execute? [y]es / [e]xplain / [n]o:")
+        if choice == 'y':
+            return conversation, formatted_git_commands_string
+        if choice == 'e':
+            # Explain path
+            LLM_response = send_to_LLM(conversation={
+                system: "You are a terminal-embedded LLM assisting a beginner terminal-user. They will provide some commands they are confused about, and you will explain granularly but concisely what the command does. Don't repeat yourself or add any fluff, and don't put any markdown formatting as it will not render.",
+                user: ("Please explain what this does before I execute it" if (only one command) else "Please explain what these do before I execute them") + f"```\n{commands, line by line}\n```"
+            }, model=quicker)
+            print LLM_response
+            # Now prompt for execute/edit/no
+            choice2 = get_valid_user_choice(['y', 'e'], "Execute? [y]es / [e]dit / [n]o:")
+            if choice2 == 'y':
+                return conversation, formatted_git_commands_string
+            if choice2 == 'e':
+                user_clarification = read from user until they hit enter
+                
+                # Update conversation with clarification and previous explanation
+                add to end of conversation {
+                    assistant: formatted_git_commands_string,
+                    user: f"can you explain {"that command" if only one command else  "those commands"}?",
 
-    read 1 character (don't wait for enter)
+                    # the '?' is because without it, it could influence LLM to send
+                    # non-git-command messages that don't end in a '?', which should never happen.
+                    assistant: LLM_response + '?',
+                    user: "Please make the following changes to the commands:\n" + user_clarification
+                }
 
-    # if char == n or anything else, assume they don't want to execute the command
-    # but since this means most things will kill the program,
-    # make the user verify if they don't enter 'n'
-    if char == 'n': exit program and print "Cancelled."
-    if char != 'e' and char != 'y':
-        print (in normal text) "Execute? [y]es / [e]xplain / [n]o:"
-        read 1 character (don't wait for enter)
-        if new_char != 'e' and new_char != 'y': exit program and print "Cancelled."
-        else: char = new_char
-    
-    if char == 'y': return conversation, formatted_git_commands_string
-    
-    # assume at this point that the user wants an explanation of the proposed command(s):
-    
-    LLM_response = send_to_LLM(conversation={
-        system: "You are a terminal-embedded LLM assisting a beginner terminal-user. They will provide some commands they are confused about, and you will explain granularly but concisely what the command does. Don't repeat yourself or add any fluff, and down put any markdown formatting as it will not render.",
-        user: ("Please explain what this does before I execute it" if (only one command) else "Please explain what these do before I execute them") + f"```\n{commands, line by line}\n```"
-    }, model=quicker)
+                LLM_output_string = send_to_LLM(conversation, model=quick)
+                git_commands = format_git_commands(LLM_output_string)
+                formatted_git_commands_string = git_commands
 
-    print LLM_response
-
-    print (in normal text) "Execute? [y]es / [e]dit / [n]o:"
-    if char == 'n': exit program and print "Cancelled."
-    if char != 'e' and char != 'y':
-        print (in normal text) "Execute? [y]es / [e]dit / [n]o:"
-        read 1 character (don't wait for enter)
-        if new_char != 'e' and new_char != 'y': exit program and print "Cancelled."
-        else: char = new_char
-
-    if char == 'y': return conversation, formatted_git_commands_string
-
-    # assume at this point that the user wants to edit their original message:
-
-    user_clarification = read from user until they hit enter
-
-    add to end of conversation {
-        assistant: formatted_git_commands_string,
-        user: "can you explain those?",
-
-        # the '?' is because without it, it could influence LLM to send
-        # non-git-command messages that don't end in a '?', which should never happen.
-        assistant: LLM_response + '?',
-        user: "Please make the following changes to the commands:\n" + user_clarification
-    }
-
-    LLM_output_string = send_to_LLM(conversation, model=quick)
-
-    git_commands = format_git_commands(LLM_output_string)
-
-    # recursive call until user agrees to commands or exits
-    conversation, git_commands_to_run = propose_git_commands_to_user(conversation, git_commands)
+                # continue loop with updated git commands and conversation
+                # until the user agrees or exits
 
 
 
