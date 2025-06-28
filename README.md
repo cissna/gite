@@ -22,6 +22,8 @@ function send_to_LLM(chat_obj, model)
 # assume that some sort of config defines quick, quicker, quickest models, so model can just be quick, quicker, or quickest and that can be decided by the user
 # for now, i am using GPT-4.1, mini, and nano for these 3
 
+function answer_question(conversation)
+
 function deal_with_potential_limitations(conversation, LLM_response_proposing_commands)
 
 function identify_potential_limitations_with_proposed_commands(conversation, LLM_response_proposing_commands)
@@ -54,17 +56,20 @@ main logic:
         user: user_str
     }
 
-    conversation, LLM_output_string = handle_conversation_until_no_question(conversation)
+    conversation = add {assistant: send_to_LLM(conversation, model=quick).strip()} to the end of conversation 
+    conversation = handle_conversation_until_no_question(conversation)
 
     # update the conversation inside the function:
-    conversation = deal_with_potential_limitations(conversation, LLM_output_string)
+    conversation = deal_with_potential_limitations(conversation)
     # this is first-order processing only. we assume that after deal_with_potential_limitations, there are no limitations left, so we don't bother to check after this, beyond letting the LLM ask questions.
 
     failed = True  # not actually true at first, but we need to get into while loop
     while failed:
-        conversation, LLM_output_string = handle_conversation_until_no_question(conversation)
-        conversation = add {assistant: LLM_output_string} to the end of conversation
+        # first iteration, handle_... is dealing with deal_with_potential_limitations
+        # later iterations, handle_... is dealing with previous iterations failures
+        conversation = handle_conversation_until_no_question(conversation)
 
+        LLM_output_string = pop last entry of conversation (remove it and return value)
         git_commands = format_git_commands(LLM_output_string)
 
         # user can exit the program from this function,
@@ -75,20 +80,25 @@ main logic:
 
         failed = are_logs_bad(logs, git_commands_to_run)
         if failed:
+            conversation = add {assistant: LLM_output_string} to the end of conversation
             conversation = add {
                 user: "I tried running these commands but I got this response:\n\n[logs]\n\nIf the solution to this is obvious, propose new git commands. If it is not, ask me questions that will help you better understand the problem."
-            } to conversation
+            } to the end of conversation
+            conversation = add {assistant: send_to_LLM(conversation, model=quick).strip()} to the end of conversation
+            
         else:
             # if logs are not bad, we assume success and exit the loop
-            print "Commands executed successfully."
+            print "Command{'' if only one command else 's'} executed successfully."
+            exit the loop
 
 
 
 function definitions:
 send_to_LLM will depend on model, but for now just assume my specific set up
 
-# this is the one that, if there are limitations found, we forge an LLM message in the conversation
-# where it says something like "I was considering using these commands [git_commands]\nBut I am worried about a potential limitation: [limitation output of identify_potential_limitations_with_proposed_commands]. [question associated with limitation]?"
+function answer_question(conversation):
+    pass
+
 function deal_with_potential_limitations(conversation, LLM_response_proposing_commands):
     # create a new system prompt that tells the LLM to read the conversation and especially the commands, and think about whether these commands are faulty, especally with regard to potential limitations that would only occur in certain scenarios.
     # then create a user prompt which actually includes the entire JSON of `conversation` and some user text at the bottom saying something like 'are there scenarios where this will fail?'
@@ -102,7 +112,8 @@ function deal_with_potential_limitations(conversation, LLM_response_proposing_co
     # where it says something like "I was considering using these commands [git_commands]\nBut I am worried about a potential limitation: [limitation output of identify_potential_limitations_with_proposed_commands]. [question associated with limitation]?"
     # and then also add the response from the user (or maybe not the user, depending on what happens in answer_question) to the conversation
     # then send back to the LLM to evaluate whether (and how) it needs to edit the suggested commands
-    # then return where the last value
+    
+    # then return the conversastion where the last value is the output is the LLMs response to the response to the question about limitations
     return conversation
 
 function identify_potential_limitations_with_proposed_commands(conversation, LLM_response_proposing_commands):
@@ -187,14 +198,16 @@ function propose_git_commands_to_user(conversation, formatted_git_commands_strin
 
 
 # handle the conversational exchange loop with the LLM, returning when the LLM no longer asks questions
+# this function assumes conversations ends with a message send by the LLM
 function handle_conversation_until_no_question(conversation):
-    LLM_output_string = send_to_LLM(conversation, model).strip()
+    assert key of last entry in conversation is 'assistant'
+    LLM_output_string = value of last entry in conversation
     while LLM_output_string ends in "?":
-        conversation = add {assistant: LLM_output_string} to the end of conversation
         # user_response may come from user or automated execution
         user_response = answer_question(conversation)
         conversation = add {user: user_response} to the end of conversation
         LLM_output_string = send_to_LLM(conversation, model=quick).strip()
+        conversation = add {assistant: LLM_output_string} to the end of conversation
     return conversation, LLM_output_string
 
 function run_commands_in_users_terminal_and_collect_logs(list_of_commands):
