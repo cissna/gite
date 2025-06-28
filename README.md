@@ -28,7 +28,7 @@ function identify_potential_limitations_with_proposed_commands(conversation, LLM
 
 function format_git_commands(unformatted_git_commands_string)
 
-function propose_git_commands_to_user(formatted_git_commands_string)
+function propose_git_commands_to_user(conversation, formatted_git_commands_string)
 
 function handle_conversation_until_no_question(conversation)
 
@@ -67,7 +67,7 @@ main logic:
 
         # user can exit the program from this function,
         # so we proceed from here we assume they agreed to these commands
-        git_commands_to_run = propose_git_commands_to_user(git_commands, conversation)
+        conversation, git_commands_to_run = propose_git_commands_to_user(conversation, git_commands)
 
         logs = run_commands_in_users_terminal_and_collect_logs(git_commands_to_run)
 
@@ -97,8 +97,67 @@ function format_git_commands(unformatted_git_commands_string):
     Then do the equivalent of python's output.split('\n') to make it a list, and return that list
 
 # recursive function where the base case is that the user says yes/no. recursively calls itself if user says explain->edit, and LLM proposes new git commands
-function propose_git_commands_to_user(formatted_git_commands_string):
-    pass
+function propose_git_commands_to_user(conversation, formatted_git_commands_string):
+    print (in blue, bold text) f"Suggested command{"s" if multiple commands else ""}:\n"
+    print each command in bold, default-color text line by line
+    print (in yellow, not bold text) "Warning: Always review AI-generated commands."
+    print (in normal text) "Execute? [y]es / [e]xplain / [n]o:"
+
+    read 1 character (don't wait for enter)
+
+    # if char == n or anything else, assume they don't want to execute the command
+    # but since this means most things will kill the program,
+    # make the user verify if they don't enter 'n'
+    if char == 'n': exit program and print "Cancelled."
+    if char != 'e' and char != 'y':
+        print (in normal text) "Execute? [y]es / [e]xplain / [n]o:"
+        read 1 character (don't wait for enter)
+        if new_char != 'e' and new_char != 'y': exit program and print "Cancelled."
+        else: char = new_char
+    
+    if char == 'y': return conversation, formatted_git_commands_string
+    
+    # assume at this point that the user wants an explanation of the proposed command(s):
+    
+    LLM_response = send_to_LLM(conversation={
+        system: "You are a terminal-embedded LLM assisting a beginner terminal-user. They will provide some commands they are confused about, and you will explain granularly but concisely what the command does. Don't repeat yourself or add any fluff, and down put any markdown formatting as it will not render.",
+        user: ("Please explain what this does before I execute it" if (only one command) else "Please explain what these do before I execute them") + f"```\n{commands, line by line}\n```"
+    }, model=quicker)
+
+    print LLM_response
+
+    print (in normal text) "Execute? [y]es / [e]dit / [n]o:"
+    if char == 'n': exit program and print "Cancelled."
+    if char != 'e' and char != 'y':
+        print (in normal text) "Execute? [y]es / [e]dit / [n]o:"
+        read 1 character (don't wait for enter)
+        if new_char != 'e' and new_char != 'y': exit program and print "Cancelled."
+        else: char = new_char
+
+    if char == 'y': return conversation, formatted_git_commands_string
+
+    # assume at this point that the user wants to edit their original message:
+
+    user_clarification = read from user until they hit enter
+
+    add to end of conversation {
+        assistant: formatted_git_commands_string,
+        user: "can you explain those?",
+
+        # the '?' is because without it, it could influence LLM to send
+        # non-git-command messages that don't end in a '?', which should never happen.
+        assistant: LLM_response + '?',
+        user: "Please make the following changes to the commands:\n" + user_clarification
+    }
+
+    LLM_output_string = send_to_LLM(conversation, model=quick)
+
+    git_commands = format_git_commands(LLM_output_string)
+
+    # recursive call until user agrees to commands or exits
+    conversation, git_commands_to_run = propose_git_commands_to_user(conversation, git_commands)
+
+
 
 # handle the conversational exchange loop with the LLM, returning when the LLM no longer asks questions
 function handle_conversation_until_no_question(conversation):
@@ -112,7 +171,7 @@ function handle_conversation_until_no_question(conversation):
     return conversation, LLM_output_string
 
 function run_commands_in_users_terminal_and_collect_logs(list_of_commands):
-    pass  # I don't know how to implement this
+    pass  # I don't know how to implement this, should return string of logs
 
 function are_logs_bad(logs):
     if logs are empty return False
