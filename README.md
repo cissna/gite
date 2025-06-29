@@ -99,25 +99,33 @@ send_to_LLM will depend on model, but for now just assume my specific set up
 function answer_question(conversation):
     pass
 
-function deal_with_potential_limitations(conversation, LLM_response_proposing_commands):
-    # create a new system prompt that tells the LLM to read the conversation and especially the commands, and think about whether these commands are faulty, especally with regard to potential limitations that would only occur in certain scenarios.
-    # then create a user prompt which actually includes the entire JSON of `conversation` and some user text at the bottom saying something like 'are there scenarios where this will fail?'
-    # send that off to the quick LLM and get back some potential limitations
+function deal_with_potential_limitations(conversation):
+    # scenario might not be the most apt name, consider changing once formatting better understood. same comment as formatting comment below, basically.
+    limitation_scenario = identify_potential_limitations_with_proposed_commands(conversation)
+
     # then make a new prompt where the system prompt suggests the LLM should be harsh and consider whether the scenario is actually likely in the real world at all, or if it is just obscure or hypothetical.
     # user prompt is basically the whole above prompting back-and-forth.
     # send that to the quick LLM and look for a response of "real limitation" or "nothing to worry about"
     # if nothing to worry about, return conversation (unchanged)
-    # if something to worry about, send a prompt to quicker LLM asking if it is definitely a problem or only possibly a problem, and if it is only possibly, ask a clarifying question to see if we are in that possible scenario or not. use answer_question.
-    # we forge an LLM message in the `conversation`
+
+    # if something to worry about, send a prompt to quicker LLM to create a clarifying question to see if the limitations apply.
+    # use answer_question on it
+
+    # we forge an LLM message in the `conversation` (this involves popping git_commands off of the conversation and adding it back)
     # where it says something like "I was considering using these commands [git_commands]\nBut I am worried about a potential limitation: [limitation output of identify_potential_limitations_with_proposed_commands]. [question associated with limitation]?"
+    # consider the formatting of [limitation output of identify_potential_limitations_with_proposed_commands], may need to adjust some things to make it make sense
+
     # and then also add the response from the user (or maybe not the user, depending on what happens in answer_question) to the conversation
     # then send back to the LLM to evaluate whether (and how) it needs to edit the suggested commands
-    
+
     # then return the conversastion where the last value is the output is the LLMs response to the response to the question about limitations
     return conversation
 
-function identify_potential_limitations_with_proposed_commands(conversation, LLM_response_proposing_commands):
-    pass
+function identify_potential_limitations_with_proposed_commands(conversation):
+    # create a new system prompt that tells the LLM to read the conversation and especially the commands, and think about whether these commands are faulty, especally with regard to potential limitations that would only occur in certain scenarios.
+    # then create a user prompt which actually includes the entire JSON of `conversation` and some user text at the bottom saying something like 'are there scenarios where this will fail?'
+    # send that off to the quick LLM and get back some potential limitations
+    return potential_limitations_LLM_response_text
 
 function format_git_commands(unformatted_git_commands_string):
     # The LLM output may include extra explanation, markdown formatting, or other noise.
