@@ -32,7 +32,9 @@ function format_git_commands(unformatted_git_commands_string)
 
 function get_valid_user_choice(nonexit_choices, prompt_text)
 
-function propose_git_commands_to_user(conversation, formatted_git_commands_string)
+function propose_git_commands_to_user(conversation, formatted_git_commands_string, explanation_text)
+
+function propose_and_run_commands_until_success(conversation, initial_commands, explanation_text)
 
 function handle_conversation_until_no_question(conversation)
 
@@ -65,35 +67,13 @@ main logic:
     conversation = deal_with_potential_limitations(conversation)
     # this is first-order processing only. we assume that after deal_with_potential_limitations, there are no limitations left, so we don't bother to check after this, beyond letting the LLM ask questions.
 
-    failed = True  # not actually true at first, but we need to get into while loop
-    while failed:
-        # first iteration, handle_... is dealing with deal_with_potential_limitations
-        # later iterations, handle_... is dealing with previous iterations failures
-        conversation = handle_conversation_until_no_question(conversation)
+    LLM_output_string = pop last entry of conversation (remove it and return value)
+    initial_commands = format_git_commands(LLM_output_string)
+    assert len(initial_commands) > 0
 
-        LLM_output_string = pop last entry of conversation (remove it and return value)
-        git_commands = format_git_commands(LLM_output_string)
-        assert len(git_commands) > 0
-
-        # user can exit the program from this function,
-        # so we proceed from here we assume they agreed to these commands
-
-        conversation, git_commands_to_run = propose_git_commands_to_user(conversation, git_commands, explanation_text=singular_to_plural("Suggested command:"))
-
-        logs = run_commands_in_users_terminal_and_collect_logs(git_commands_to_run)
-
-        failed = are_logs_bad(logs, git_commands_to_run)
-        if failed:
-            conversation = add {assistant: LLM_output_string} to the end of conversation
-            conversation = add {
-                user: "I tried running these commands but I got this response:\n\n[logs]\n\nIf the solution to this is obvious, propose new git commands. If it is not, ask me questions that will help you better understand the problem."
-            } to the end of conversation
-            conversation = add {assistant: send_to_LLM(conversation, model=quick).strip()} to the end of conversation
-            
-        else:
-            # if logs are not bad, we assume success and exit the loop
-            print "Command{'' if only one command else 's'} executed successfully."
-            exit the loop
+    # This function will loop until the commands are successfully executed.
+    # It handles proposing, explaining, editing, and running the commands.
+    conversation, _ = propose_and_run_commands_until_success(conversation, initial_commands, explanation_text=singular_to_plural("Suggested command:"))
 
 
 
@@ -125,11 +105,15 @@ function answer_question(conversation)
 
     # we sort of doubt the user will edit these commands, but give them the option
     # so if they do, the prompt will be kind of janky and we definitely DO NOT want that updating the conversation, hence the `_`.
-    _, commands_to_run = propose_git_commands_to_user(conversation, formatted_string, explanation_text=explanation_text)
-
-    logs = run_commands_in_users_terminal_and_collect_logs(git_commands_to_run)
-
-    failed = are_logs_bad(logs, git_commands_to_run)
+    # This function will loop until the commands are successfully executed.
+    # It handles proposing, explaining, editing, and running the commands.
+    # We pass `update_conversation_on_edit=False` because we don't want to pollute the main conversation
+    # with edits made to these temporary, information-gathering commands.
+    _, logs = propose_and_run_commands_until_success(
+        conversation,
+        initial_commands=formatted_string,
+        explanation_text=explanation_text
+    )
 
     
 
@@ -203,47 +187,85 @@ function get_valid_user_choice(nonexit_choices, prompt_text):
 
 
 # proposes git commands to user, supports explain/edit/execute without code duplication
-function propose_git_commands_to_user(conversation, formatted_git_commands_string, explanation_text):
+# This is the core loop for proposing, editing, and running commands until they succeed.
+function propose_and_run_commands_until_success(conversation, initial_commands, explanation_text):
+    # Always work on a copy of the conversation to avoid side effects.
+    # The caller can decide whether to use the returned, updated conversation.
+    temp_conversation = conversation.copy()
+    current_commands = initial_commands
+    failed = True
+
+    while failed:
+        # Propose the commands to the user and get their agreement to run them.
+        # This function returns the potentially updated conversation and the commands to run.
+        temp_conversation, commands_to_run = propose_git_commands_to_user(
+            temp_conversation,
+            current_commands,
+            explanation_text
+        )
+
+        logs = run_commands_in_users_terminal_and_collect_logs(commands_to_run)
+        failed = are_logs_bad(logs, commands_to_run)
+
+        if failed:
+            # If the commands fail, update the conversation to send to the LLM for a fix.
+            temp_conversation = add {assistant: commands_to_run} to the end of temp_conversation
+            temp_conversation = add {
+                user: "I tried running these commands but I got this response:\n\n[logs]\n\nIf the solution to this is obvious, propose new git commands. If it is not, ask me questions that will help you better understand the problem."
+            } to the end of temp_conversation
+            
+            LLM_output_string = send_to_LLM(temp_conversation, model=quick).strip()
+            
+            # The LLM might ask a question back. Handle that conversation loop.
+            temp_conversation = add {assistant: LLM_output_string} to the end of temp_conversation
+            temp_conversation, LLM_output_string = handle_conversation_until_no_question(temp_conversation)
+
+            # The new commands to try in the next iteration of the loop
+            current_commands = format_git_commands(LLM_output_string)
+        else:
+            # Success! Print a confirmation message and return the final state.
+            print "Command{'' if only one command else 's'} executed successfully."
+            return temp_conversation, logs
+
+# This function now only handles the user interaction part (propose/explain/edit)
+function propose_git_commands_to_user(conversation, formatted_git_commands, explanation_text):
+    # This function can modify the conversation if the user edits the commands.
+    # It returns the (potentially modified) conversation and the final commands.
+    temp_conversation = conversation.copy()
+
     while True:
         print (in blue, bold text) explanation_text
         print each command in bold, default-color text line by line
         print (in yellow, not bold text) "Warning: Always review AI-generated commands."
 
-        # exits from within this function if user enters 'n':
         choice = get_valid_user_choice(['y', 'e'], "Execute? [y]es / [e]xplain / [n]o:")
         if choice == 'y':
-            return conversation, formatted_git_commands_string
+            return temp_conversation, formatted_git_commands
         if choice == 'e':
-            # Explain path
             LLM_response = send_to_LLM(conversation={
                 system: "You are a terminal-embedded LLM assisting a beginner terminal-user. They will provide some commands they are confused about, and you will explain granularly but concisely what the command does. Don't repeat yourself or add any fluff, and don't put any markdown formatting as it will not render.",
-                user: ("Please explain what this does before I execute it" if (only one command) else "Please explain what these do before I execute them") + "```\n{commands, line by line}\n```"
+                user: singular_to_plural("Please explain what this does before I execute it", formatted_git_commands) + "```\n{commands, line by line}\n```"
             }, model=quicker)
             print LLM_response
-            # Now prompt for execute/edit/no
+            
             choice2 = get_valid_user_choice(['y', 'e'], "Execute? [y]es / [e]dit / [n]o:")
             if choice2 == 'y':
-                return conversation, formatted_git_commands_string
+                return temp_conversation, formatted_git_commands
             if choice2 == 'e':
                 user_clarification = read from user until they hit enter
                 
-                # Update conversation with clarification and previous explanation
-                add to end of conversation {
-                    assistant: formatted_git_commands_string,
-                    user: ("can you explain that command?" if only one command else "can you explain those commands?"),
-
-                    # the '?' is because without it, it could influence LLM to send
-                    # non-git-command messages that don't end in a '?', which should never happen.
+                add to end of temp_conversation {
+                    assistant: formatted_git_commands,
+                    user: singular_to_plural("can you explain that command?", formatted_git_commands),
                     assistant: LLM_response + '?',
                     user: "Please make the following changes to the commands:\n" + user_clarification
                 }
 
-                LLM_output_string = send_to_LLM(conversation, model=quick)
-                git_commands = format_git_commands(LLM_output_string)
-                formatted_git_commands_string = git_commands
-
-                # continue loop with updated git commands and conversation
-                # until the user agrees or exits
+                LLM_output_string = send_to_LLM(temp_conversation, model=quick)
+                
+                # Update the commands for the next loop iteration to re-propose them.
+                formatted_git_commands = format_git_commands(LLM_output_string)
+                # continue the while loop
 
 
 

@@ -10,4 +10,5 @@
     - note that auxiliary commands, if edited, will be kind of a suboptimal prompt.
         - Not worth fixing though because it will likely work well enough and rarely happen anyway.
 - make a note about separating the auto-execute flag for auxiliary commands and git commands (maybe not at all for git commands)
+- "gemini refactored everything so that I could reuse the command suggestion loop." -m "Not sure if I like it, need to read through more carefully"
 
