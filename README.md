@@ -73,6 +73,7 @@ main logic:
 
         LLM_output_string = pop last entry of conversation (remove it and return value)
         git_commands = format_git_commands(LLM_output_string)
+        assert len(git_commands) > 0
 
         # user can exit the program from this function,
         # so we proceed from here we assume they agreed to these commands
@@ -107,10 +108,23 @@ function singular_to_plural(singular_text, commands)
         return singular_text.replace('command', 'commands').replace('this', 'these').replace('it', 'them').replace('that', 'those')
 
 function answer_question(conversation)
-    let question by last item in conversation
+    let question be the last item in conversation
     assert question ends in a question mark
+
+    formatted_string = format_git_commands(send_to_LLM({
+        system: "You are an assistant who detects automatable tasks. I will attach a conversation between an LLM and person, and your job is to look at the final message (given the context of the above messages), which will be a question to the user. You don't want the user to have to spend time answering questions are easily answerable without, so you will detect whether a question can be answerable by terminal commands. If it is answerable by terminal commands, provide those terminal commands.
+        If you determine it is *not* answerable with terminal commands (because it needs the insight of a human to clarify their intentions or have a more comprehensive understanding of the relevant information), reply that this text needs to be answered by a human. If you are unsure of what terminal commands are necessary, feel free to choose this response—at the end of the day, it's better if the human correctly answers it than the terminal incorrectly answering.",
+        user: 
+    }, model=quick))
+
+    if len(git_commands) == 0:
+        Ask the question to the user, return their response. Loop until they actually respond (no accidentally hitting enter)
     
-    send conversation to LLM and ask if the question can be answered by terminal commands, or if it needs the insight of a human to clarify their intentions or have a more comprehensive understanding of the relevant information. limit it to strictly commands or person. probably quick model.
+    # at this point, we assume formatted_string is terminal commands to be executed:
+    explanation_text = singular_to_plural("Gite wants to run this command to gather information:")
+    propose_git_commands_to_user(conversation, formatted_string, explanation_text=explanation_text)
+
+    
 
 function deal_with_potential_limitations(conversation):
     # scenario might not be the most apt name, consider changing once formatting better understood. same comment as formatting comment below, basically.
@@ -153,9 +167,13 @@ function format_git_commands(unformatted_git_commands_string):
         system: "You are a parser. The user will provide text that contains one or more terminal commands, possibly surrounded by explanatory text or markdown formatting.
         Extract only the git commands.
         Return ONLY the commands, each on a new line.
-        Do not include any other text, explanation, or markdown formatting like ```.",
+        Do not include any other text, explanation, or markdown formatting like ```.
+        If there are no commands, reply with the EXACT TEXT (NOTHING ELSE), \"No commands in this text.\"",
         user: unformatted_git_commands_string
     }, model=quickest)
+
+    if formatted_string == 'No commands in this text.':  # maybe make this more lenient in case the 'quickest' models doesn't perfectly match this text. Candidates for leniency: stripped, lowercase, punctuation doesn't matter, missing any (or all) of the last 3 words.
+        return []
 
     # Split into lines, removing blank lines and stripping any whitespace.
     return [line.strip() for line in formatted_string.split('\n') if line.strip()]  # this line is python not pseudocode
