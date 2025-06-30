@@ -122,7 +122,14 @@ function answer_question(conversation)
     
     # at this point, we assume formatted_string is terminal commands to be executed:
     explanation_text = singular_to_plural("Gite wants to run this command to gather information:")
-    propose_git_commands_to_user(conversation, formatted_string, explanation_text=explanation_text)
+
+    # we sort of doubt the user will edit these commands, but give them the option
+    # so if they do, the prompt will be kind of janky and we definitely DO NOT want that updating the conversation, hence the `_`.
+    _, commands_to_run = propose_git_commands_to_user(conversation, formatted_string, explanation_text=explanation_text)
+
+    logs = run_commands_in_users_terminal_and_collect_logs(git_commands_to_run)
+
+    failed = are_logs_bad(logs, git_commands_to_run)
 
     
 

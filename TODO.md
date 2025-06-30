@@ -7,5 +7,7 @@
         - Figure out how to properly deal with len == 0 (maybe fine as is with assert)
     - need to make sure to use singular->plural all places it’s applicable
     - go thru prompts and make them actually do what I want + add some prompt engineering flare
+    - note that auxiliary commands, if edited, will be kind of a suboptimal prompt.
+        - Not worth fixing though because it will likely work well enough and rarely happen anyway.
 - make a note about separating the auto-execute flag for auxiliary commands and git commands (maybe not at all for git commands)
 
