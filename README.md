@@ -40,6 +40,8 @@ function run_commands_in_users_terminal_and_collect_logs(list_of_commands)
 
 function are_logs_bad(logs, commands)
 
+function singular_to_plural(singular_text, commands)
+
 system_prompt = """You are an Expert Git assistant helping a beginner use Git. They want to do something with Git which they can describe, but need you to help them translate that into a viable command.
 To be viable, the command must be non-interactive, i.e., executable without ANY alterations—no fill in the blanks or ...s.
 They will provide you a description of what they want, and you will return a non-interactive command or a list of non-interactive commands that accomplishes their goal.
@@ -74,7 +76,8 @@ main logic:
 
         # user can exit the program from this function,
         # so we proceed from here we assume they agreed to these commands
-        conversation, git_commands_to_run = propose_git_commands_to_user(conversation, git_commands)
+
+        conversation, git_commands_to_run = propose_git_commands_to_user(conversation, git_commands, explanation_text=singular_to_plural("Suggested command:"))
 
         logs = run_commands_in_users_terminal_and_collect_logs(git_commands_to_run)
 
@@ -95,6 +98,13 @@ main logic:
 
 function definitions:
 send_to_LLM will depend on model, but for now just assume my specific set up
+
+function singular_to_plural(singular_text, commands)
+    assert len(commands) > 0
+    if len(commands) == 1:
+        return singular_text
+    else:
+        return singular_text.replace('command', 'commands').replace('this', 'these').replace('it', 'them').replace('that', 'those')
 
 function answer_question(conversation)
     let question by last item in conversation
@@ -168,11 +178,13 @@ function get_valid_user_choice(nonexit_choices, prompt_text):
 
 
 # proposes git commands to user, supports explain/edit/execute without code duplication
-function propose_git_commands_to_user(conversation, formatted_git_commands_string):
+function propose_git_commands_to_user(conversation, formatted_git_commands_string, explanation_text):
     while True:
-        print (in blue, bold text) "Suggested command{'s' if multiple commands else ''}:\n"
+        print (in blue, bold text) explanation_text
         print each command in bold, default-color text line by line
         print (in yellow, not bold text) "Warning: Always review AI-generated commands."
+
+        # exits from within this function if user enters 'n':
         choice = get_valid_user_choice(['y', 'e'], "Execute? [y]es / [e]xplain / [n]o:")
         if choice == 'y':
             return conversation, formatted_git_commands_string
