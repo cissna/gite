@@ -96,8 +96,11 @@ main logic:
 function definitions:
 send_to_LLM will depend on model, but for now just assume my specific set up
 
-function answer_question(conversation):
-    pass
+function answer_question(conversation)
+    let question by last item in conversation
+    assert question ends in a question mark
+    
+    send conversation to LLM and ask if the question can be answered by terminal commands, or if it needs the insight of a human to clarify their intentions or have a more comprehensive understanding of the relevant information. limit it to strictly commands or person. probably quick model.
 
 function deal_with_potential_limitations(conversation):
     # scenario might not be the most apt name, consider changing once formatting better understood. same comment as formatting comment below, basically.
