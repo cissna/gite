@@ -123,6 +123,8 @@ function deal_with_potential_limitations(conversation):
 
 function identify_potential_limitations_with_proposed_commands(conversation):
     # create a new system prompt that tells the LLM to read the conversation and especially the commands, and think about whether these commands are faulty, especally with regard to potential limitations that would only occur in certain scenarios.
+    # prompt specificity: "don't response with anything but a sentence explaining the potential limitations, please don't start the sentence with \"the potential limitations are...\", as it is redundant."
+
     # then create a user prompt which actually includes the entire JSON of `conversation` and some user text at the bottom saying something like 'are there scenarios where this will fail?'
     # send that off to the quick LLM and get back some potential limitations
     return potential_limitations_LLM_response_text
