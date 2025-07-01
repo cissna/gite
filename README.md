@@ -284,6 +284,7 @@ function handle_conversation_until_no_question(conversation):
 
 function run_commands_in_users_terminal_and_collect_logs(list_of_commands):
     pass  # I don't know how to implement this, should return string of logs
+    # i think we may use the `script` terminal command to collect logs for more complicated, interactive commands, like `git add -p` or `git commit`
 
 function are_logs_bad(logs, commands):
     if logs are empty: return False

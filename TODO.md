@@ -4,8 +4,9 @@
     - [ ] other uses of pbcopy for ease
     - [ ] Make it so when the git commands execute, it reprints them at the end and gives a y/n to copy or not (config to remove option)
         - [ ] If some commands fail and then they run more, we should probably print the failed commands in red and then also print the successful commands in green. In case the first ones also matter for the second ones
-    - [ ] But that's only one of the cases, when it's determined that the command running is not interactive. If the command is interactive, it should forgo log collecting and just let it run
-        - [ ] In this case, it *can't* print at the end (I think, need to verify this fact), so we should ask to copy before it runs.
+    - [x] But that's only one of the cases, when it's determined that the command running is not interactive. If the command is interactive, it should forgo log collecting and just let it run
+        - [x] In this case, it *can't* print at the end (I think, need to verify this fact), so we should ask to copy before it runs.
+        - [x] ACTUALLY, we can collect the whole logs no matter what. We just may need to use the `script` bash command
 - [ ] buncha stuff is fucked up
     - [ ] git_commands is sometimes a list, sometimes a string
         - [ ] Figure out how to properly deal with len == 0 (maybe fine as is with assert)
