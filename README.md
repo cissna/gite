@@ -191,7 +191,7 @@ function get_valid_user_choice(nonexit_choices, prompt_text):
 function propose_and_run_commands_until_success(conversation, initial_commands, explanation_text):
     # Always work on a copy of the conversation to avoid side effects.
     # The caller can decide whether to use the returned, updated conversation.
-    temp_conversation = conversation.copy()
+    temp_conversation = conversation.copy()  # this may be unnecessary depending on the specific implementation
     current_commands = initial_commands
     failed = True
 

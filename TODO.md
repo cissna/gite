@@ -1,4 +1,5 @@
 # TODO
+- [ ] fill out deal_with_limitations
 - [ ] figure out what to do instead of assertions
 - [x] ponder on git commands running on their own vs by the user / how this happens
     - [ ] other uses of pbcopy for ease. specifically, adding it as an option before any command execution ['y', 'e', 'c'] 'c' for copy.
