@@ -1,7 +1,7 @@
 # TODO
 - [ ] figure out what to do instead of assertions
-- [ ] ponder on git commands running on their own vs by the user / how this happens
-    - [ ] other uses of pbcopy for ease
+- [x] ponder on git commands running on their own vs by the user / how this happens
+    - [ ] other uses of pbcopy for ease. specifically, adding it as an option before any command execution ['y', 'e', 'c'] 'c' for copy.
     - [ ] Make it so when the git commands execute, it reprints them at the end and gives a y/n to copy or not (config to remove option)
         - [ ] If some commands fail and then they run more, we should probably print the failed commands in red and then also print the successful commands in green. In case the first ones also matter for the second ones
     - [x] But that's only one of the cases, when it's determined that the command running is not interactive. If the command is interactive, it should forgo log collecting and just let it run
@@ -17,4 +17,5 @@
     - [ ] Add to the prompt about error handling to undo what commands were done if necessasry.
 - [ ] make a note about separating the auto-execute flag for auxiliary commands and git commands (maybe not at all for git commands)
 - [ ] "gemini refactored everything so that I could reuse the command suggestion loop." -m "Not sure if I like it, need to read through more carefully"
+- [ ] look into the git add --all situation...i.e. a command that practically isn't useful, but might pass a "limitations" check. Should we make it so the limitation check incorporates a general verification that a user *actually* wants something weird? Or maybe just include in the original prompt, some probing to make it simpler unless the user makes it **very** explicit that they want something weird. (i kinda like the latter for general simplicity on the user's end)
 
