@@ -73,7 +73,7 @@ main logic:
 
     # This function will loop until the commands are successfully executed.
     # It handles proposing, explaining, editing, and running the commands.
-    conversation, _ = propose_and_run_commands_until_success(conversation, initial_commands, explanation_text=singular_to_plural("Suggested command:"))
+    conversation, _, _ = propose_and_run_commands_until_success(conversation, initial_commands, explanation_text=singular_to_plural("Suggested command:"))
 
 
 
@@ -91,7 +91,7 @@ function answer_question(conversation)
     let question be the last item in conversation
     assert question ends in a question mark
 
-    formatted_string = format_git_commands(send_to_LLM({
+    git_commands = format_git_commands(send_to_LLM({
         system: "You are an assistant who detects automatable tasks. I will attach a conversation between an LLM and person, and your job is to look at the final message (given the context of the above messages), which will be a question to the user. You don't want the user to have to spend time answering questions are easily answerable without, so you will detect whether a question can be answerable by terminal commands. If it is answerable by terminal commands, provide those terminal commands.
         If you determine it is *not* answerable with terminal commands (because it needs the insight of a human to clarify their intentions or have a more comprehensive understanding of the relevant information), reply that this text needs to be answered by a human. If you are unsure of what terminal commands are necessary, feel free to choose this response—at the end of the day, it's better if the human correctly answers it than the terminal incorrectly answering.",
         user: 
@@ -100,7 +100,7 @@ function answer_question(conversation)
     if len(git_commands) == 0:
         Ask the question to the user, return their response. Loop until they actually respond (no accidentally hitting enter)
     
-    # at this point, we assume formatted_string is terminal commands to be executed:
+    # at this point, we assume git_commands are the terminal commands to be executed:
     explanation_text = singular_to_plural("Gite wants to run this command to gather information:")
 
     # we sort of doubt the user will edit these commands, but give them the option
@@ -109,12 +109,15 @@ function answer_question(conversation)
     # It handles proposing, explaining, editing, and running the commands.
     # We pass `update_conversation_on_edit=False` because we don't want to pollute the main conversation
     # with edits made to these temporary, information-gathering commands.
-    _, logs = propose_and_run_commands_until_success(
+    _, logs, commands_that_were_run = propose_and_run_commands_until_success(
         conversation,
-        initial_commands=formatted_string,
+        initial_commands=git_commands,
         explanation_text=explanation_text
     )
 
+    return singular_to_plural('To answer your question, I ran this command:\n```\n') +
+           (commands_that_were_run, separated line by line) + '```\nAnd I got this response:\n```\n' +
+           logs + '```\n\nDoes that answer your question? If not, ask me further questions. If it does, continue with assisting me."
     
 
 function deal_with_potential_limitations(conversation):
@@ -225,7 +228,7 @@ function propose_and_run_commands_until_success(conversation, initial_commands, 
         else:
             # Success! Print a confirmation message and return the final state.
             print "Command{'' if only one command else 's'} executed successfully."
-            return temp_conversation, logs
+            return temp_conversation, logs, commands_to_run  # at this point it's more like commands_that_were_run
 
 # This function now only handles the user interaction part (propose/explain/edit)
 function propose_git_commands_to_user(conversation, formatted_git_commands, explanation_text):
