@@ -13,10 +13,11 @@
         - [ ] Figure out how to properly deal with len == 0 (maybe fine as is with assert)
     - [ ] need to make sure to use singular->plural all places it’s applicable
     - [ ] go thru prompts and make them actually do what I want + add some prompt engineering flare
-    - [ ] note that auxiliary commands, if edited, will be kind of a suboptimal prompt.
-        - [ ] Not worth fixing though because it will likely work well enough and rarely happen anyway.
+    - [x] note that auxiliary commands, if edited, will be kind of a suboptimal prompt.
+        - [x] Not worth fixing though because it will likely work well enough and rarely happen anyway.
     - [ ] Add to the prompt about error handling to undo what commands were done if necessasry.
 - [ ] make a note about separating the auto-execute flag for auxiliary commands and git commands (maybe not at all for git commands)
 - [ ] "gemini refactored everything so that I could reuse the command suggestion loop." -m "Not sure if I like it, need to read through more carefully"
 - [ ] look into the git add --all situation...i.e. a command that practically isn't useful, but might pass a "limitations" check. Should we make it so the limitation check incorporates a general verification that a user *actually* wants something weird? Or maybe just include in the original prompt, some probing to make it simpler unless the user makes it **very** explicit that they want something weird. (i kinda like the latter for general simplicity on the user's end)
+- [ ] Consider how to add the --not-git flag that is for general terminal commands
 

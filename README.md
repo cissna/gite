@@ -73,7 +73,7 @@ main logic:
 
     # This function will loop until the commands are successfully executed.
     # It handles proposing, explaining, editing, and running the commands.
-    conversation, _, _ = propose_and_run_commands_until_success(conversation, initial_commands, explanation_text=singular_to_plural("Suggested command:"))
+    conversation, _, _ = propose_and_run_commands_until_success(conversation, initial_commands, explanation_text="Suggested command:")
 
 
 
@@ -101,7 +101,6 @@ function answer_question(conversation)
         Ask the question to the user, return their response. Loop until they actually respond (no accidentally hitting enter)
     
     # at this point, we assume git_commands are the terminal commands to be executed:
-    explanation_text = singular_to_plural("Gite wants to run this command to gather information:")
 
     # we sort of doubt the user will edit these commands, but give them the option
     # so if they do, the prompt will be kind of janky and we definitely DO NOT want that updating the conversation, hence the `_`.
@@ -115,7 +114,7 @@ function answer_question(conversation)
         explanation_text=explanation_text
     )
 
-    return singular_to_plural('To answer your question, I ran this command:\n```\n') +
+    return singular_to_plural('To answer your question, I ran this command:\n```\n', commands_that_were_run) +
            (commands_that_were_run, separated line by line) + '```\nAnd I got this response:\n```\n' +
            logs + '```\n\nDoes that answer your question? If not, ask me further questions. If it does, continue with assisting me."
     
@@ -192,6 +191,8 @@ function get_valid_user_choice(nonexit_choices, prompt_text):
 # proposes git commands to user, supports explain/edit/execute without code duplication
 # This is the core loop for proposing, editing, and running commands until they succeed.
 function propose_and_run_commands_until_success(conversation, initial_commands, explanation_text):
+    explanation_text_formatted = singular_to_plural(explanation_text, initial_commands)
+
     # Always work on a copy of the conversation to avoid side effects.
     # The caller can decide whether to use the returned, updated conversation.
     temp_conversation = conversation.copy()  # this may be unnecessary depending on the specific implementation
@@ -204,7 +205,7 @@ function propose_and_run_commands_until_success(conversation, initial_commands, 
         temp_conversation, commands_to_run = propose_git_commands_to_user(
             temp_conversation,
             current_commands,
-            explanation_text
+            explanation_text_formatted
         )
 
         logs = run_commands_in_users_terminal_and_collect_logs(commands_to_run)
