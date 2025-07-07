@@ -228,7 +228,7 @@ function propose_and_run_commands_until_success(conversation, initial_commands, 
             current_commands = format_git_commands(LLM_output_string)
         else:
             # Success! Print a confirmation message and return the final state.
-            print "Command{'' if only one command else 's'} executed successfully."
+            print singular_to_plural("Command executed successfully.", current_commands)
             return temp_conversation, logs, commands_to_run  # at this point it's more like commands_that_were_run
 
 # This function now only handles the user interaction part (propose/explain/edit)
