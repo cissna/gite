@@ -28,7 +28,7 @@ function deal_with_potential_limitations(conversation, LLM_response_proposing_co
 
 function identify_potential_limitations_with_proposed_commands(conversation, LLM_response_proposing_commands)
 
-function format_git_commands(unformatted_git_commands_string)
+function format_terminal_commands(unformatted_git_commands_string)
 
 function get_valid_user_choice(nonexit_choices, prompt_text)
 
@@ -68,7 +68,7 @@ main logic:
     # this is first-order processing only. we assume that after deal_with_potential_limitations, there are no limitations left, so we don't bother to check after this, beyond letting the LLM ask questions.
 
     LLM_output_string = pop last entry of conversation (remove it and return value)
-    initial_commands = format_git_commands(LLM_output_string)
+    initial_commands = format_terminal_commands(LLM_output_string)
     assert len(initial_commands) > 0
 
     # This function will loop until the commands are successfully executed.
@@ -91,7 +91,7 @@ function answer_question(conversation)
     let question be the last item in conversation
     assert question ends in a question mark
 
-    git_commands = format_git_commands(send_to_LLM({
+    git_commands = format_terminal_commands(send_to_LLM({
         system: "You are an assistant who detects automatable tasks. I will attach a conversation between an LLM and person, and your job is to look at the final message (given the context of the above messages), which will be a question to the user. You don't want the user to have to spend time answering questions are easily answerable without, so you will detect whether a question can be answerable by terminal commands. If it is answerable by terminal commands, provide those terminal commands.
         If you determine it is *not* answerable with terminal commands (because it needs the insight of a human to clarify their intentions or have a more comprehensive understanding of the relevant information), reply that this text needs to be answered by a human. If you are unsure of what terminal commands are necessary, feel free to choose this response—at the end of the day, it's better if the human correctly answers it than the terminal incorrectly answering.",
         user: 
@@ -149,7 +149,7 @@ function identify_potential_limitations_with_proposed_commands(conversation):
     # send that off to the quick LLM and get back some potential limitations
     return potential_limitations_LLM_response_text
 
-function format_git_commands(unformatted_git_commands_string):
+function format_terminal_commands(unformatted_git_commands_string):
     # The LLM output may include extra explanation, markdown formatting, or other noise.
     # This function sends that output to the quickest model, instructing:
     #   - Only extract actual git commands.
@@ -169,7 +169,7 @@ function format_git_commands(unformatted_git_commands_string):
         return []
 
     # Split into lines, removing blank lines and stripping any whitespace.
-    return [line.strip() for line in formatted_string.split('\n') if line.strip()]  # this line is python not pseudocode
+    return [line.strip() for line in formatted_string.split('\n') if line.strip()]
 
 # Helper to validate user input and handle cancellation/reprompt
 function get_valid_user_choice(nonexit_choices, prompt_text):
@@ -222,10 +222,12 @@ function propose_and_run_commands_until_success(conversation, initial_commands, 
             
             # The LLM might ask a question back. Handle that conversation loop.
             temp_conversation = add {assistant: LLM_output_string} to the end of temp_conversation
-            temp_conversation, LLM_output_string = handle_conversation_until_no_question(temp_conversation)
+            temp_conversation = handle_conversation_until_no_question(temp_conversation)
+            LLM_output_string = pop last element of temp_conversation
 
             # The new commands to try in the next iteration of the loop
-            current_commands = format_git_commands(LLM_output_string)
+            current_commands = format_terminal_commands(LLM_output_string)
+            assert len(current_commands) > 0
         else:
             # Success! Print a confirmation message and return the final state.
             print singular_to_plural("Command executed successfully.", current_commands)
@@ -248,7 +250,7 @@ function propose_git_commands_to_user(conversation, formatted_git_commands, expl
         if choice == 'e':
             LLM_response = send_to_LLM(conversation={
                 system: "You are a terminal-embedded LLM assisting a beginner terminal-user. They will provide some commands they are confused about, and you will explain granularly but concisely what the command does. Don't repeat yourself or add any fluff, and don't put any markdown formatting as it will not render.",
-                user: singular_to_plural("Please explain what this does before I execute it", formatted_git_commands) + "```\n{commands, line by line}\n```"
+                user: singular_to_plural("Please explain what this does before I execute it", formatted_git_commands) + "```\n{formatted_git_commands, line by line}\n```"
             }, model=quicker)
             print LLM_response
             
@@ -259,16 +261,21 @@ function propose_git_commands_to_user(conversation, formatted_git_commands, expl
                 user_clarification = read from user until they hit enter
                 
                 add to end of temp_conversation {
-                    assistant: formatted_git_commands,
+                    assistant: formatted_git_commands as a string line by line,
                     user: singular_to_plural("can you explain that command?", formatted_git_commands),
                     assistant: LLM_response + '?',
                     user: "Please make the following changes to the commands:\n" + user_clarification
                 }
 
                 LLM_output_string = send_to_LLM(temp_conversation, model=quick)
+            
+                # The LLM *almost* definitely won't ask a question back. Just in case, handle that conversation loop.
+                temp_conversation = add {assistant: LLM_output_string} to the end of temp_conversation
+                temp_conversation = handle_conversation_until_no_question(temp_conversation)
+                LLM_output_string = pop last element of temp_conversation
                 
                 # Update the commands for the next loop iteration to re-propose them.
-                formatted_git_commands = format_git_commands(LLM_output_string)
+                formatted_git_commands = format_terminal_commands(LLM_output_string)
                 # continue the while loop
 
 
@@ -284,7 +291,7 @@ function handle_conversation_until_no_question(conversation):
         conversation = add {user: user_response} to the end of conversation
         LLM_output_string = send_to_LLM(conversation, model=quick).strip()
         conversation = add {assistant: LLM_output_string} to the end of conversation
-    return conversation, LLM_output_string
+    return conversation
 
 function run_commands_in_users_terminal_and_collect_logs(list_of_commands):
     pass  # I don't know how to implement this, should return string of logs

@@ -8,9 +8,9 @@
     - [x] But that's only one of the cases, when it's determined that the command running is not interactive. If the command is interactive, it should forgo log collecting and just let it run
         - [x] In this case, it *can't* print at the end (I think, need to verify this fact), so we should ask to copy before it runs.
         - [x] ACTUALLY, we can collect the whole logs no matter what. We just may need to use the `script` bash command
-- [ ] buncha stuff is fucked up
-    - [ ] git_commands is sometimes a list, sometimes a string
-        - [ ] Figure out how to properly deal with len == 0 (maybe fine as is with assert)
+- [ ] ~~buncha~~**some** stuff is fucked up
+    - [x] git_commands is sometimes a list, sometimes a string
+        - [x] Figure out how to properly deal with len == 0 (maybe fine as is with assert)
     - [x] need to make sure to use singular->plural all places it’s applicable
     - [ ] go thru prompts and make them actually do what I want + add some prompt engineering flare
     - [x] note that auxiliary commands, if edited, will be kind of a suboptimal prompt.
