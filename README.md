@@ -345,3 +345,4 @@ function are_logs_bad(logs, commands):
 
 ## Long-term future considerations
 Right now, the tool only works with my specific Azure GPT-4.1 API key, which is less than ideal. I'll make setup more user friendly once I'm happy with the project.
+
