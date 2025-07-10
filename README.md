@@ -121,10 +121,13 @@ function answer_question(conversation)
 
 function deal_with_potential_limitations(conversation):
     # scenario might not be the most apt name, consider changing once formatting better understood. same comment as formatting comment below, basically.
-    limitation_scenario = identify_potential_limitations_with_proposed_commands(conversation)
+    limitations = identify_potential_limitations_with_proposed_commands(conversation)
 
     # then make a new prompt where the system prompt suggests the LLM should be harsh and consider whether the scenario is actually likely in the real world at all, or if it is just obscure or hypothetical.
     # user prompt is basically the whole above prompting back-and-forth.
+    system_prompt = "I'm the programmer and I asked another LLM to review this back and forth involving a beginner Git user trying to figure out the proper commands to accomplish some task. However, the LLM I used notoriously overstates problems, so your job is to determine whether the problem is real (in the specified scenario, if there is one), and if there is a specified scenario, whether or not the specified scenario is actually possible on a normal MacOS terminal. I cast doubt because it definitely sometimes says something is a problem when it's not, however it also is obviously sometimes right, so your job is to be the arbiter to help me be realistic. If the concern is legitimate, respond either \"There is definitely a problem in the provided commands.\" or \"There may be a problem with the provided commands.\" if the problem's existence is dependant on information the user needs to provide. Otherwise, respond \"It is likely the provided commands will succeed in fulfilling the user's needs.\". In any case, do not respond with ANY additional text besides EXACTLY the above sentences."
+    user_prompt = "Here is the conversation involving a user getting help from a LLM in finding the right git commands:\n```\n" + stringify(conversation) + "\n```\n\nAnd this is the limitation proposed by the not-super-trustworthy LLM: \"" + limitations + "\"\nRespond in the specific way indicated in the system prompt, determing whether the concern is legitimate."
+
     # send that to the quick LLM and look for a response of "real limitation" or "nothing to worry about"
     # if nothing to worry about, return conversation (unchanged)
 
@@ -143,7 +146,8 @@ function deal_with_potential_limitations(conversation):
 
 function identify_potential_limitations_with_proposed_commands(conversation):
     # create a new system prompt that tells the LLM to read the conversation and especially the commands, and think about whether these commands are faulty, especally with regard to potential limitations that would only occur in certain scenarios.
-    # prompt specificity: "don't response with anything but a sentence explaining the potential limitations, please don't start the sentence with \"the potential limitations are...\", as it is redundant."
+    # prompt specificity: "don't respond with anything but an explanation of the potential limitations, please don't start the sentence with \"the potential limitations are...\" or anything similar, as it is redundant."
+    # "However, since they are a beginner is very possible they are leaving out details about some specific context"
 
     # then create a user prompt which actually includes the entire JSON of `conversation` and some user text at the bottom saying something like 'are there scenarios where this will fail?'
     # send that off to the quick LLM and get back some potential limitations

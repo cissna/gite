@@ -11,6 +11,7 @@
 - [ ] ~~buncha~~**some** stuff is fucked up
     - [x] git_commands is sometimes a list, sometimes a string
         - [x] Figure out how to properly deal with len == 0 (maybe fine as is with assert)
+    - [ ] when conversation is passed into a function, is it passed by reference or value? if by reference, should we make a copy to promote safety?
     - [x] need to make sure to use singular->plural all places it’s applicable
     - [ ] go thru prompts and make them actually do what I want + add some prompt engineering flare
     - [x] note that auxiliary commands, if edited, will be kind of a suboptimal prompt.
